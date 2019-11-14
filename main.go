@@ -1,113 +1,69 @@
 package main
 
 import (
-    "fmt"
-    "io"
-    "log"
-    "net/http"
-    "os"
+	"fmt"
+	"io"
+	"os"
 
-    "github.com/urfave/cli"
+	"golang.org/x/net/html"
 )
 
-var app = cli.NewApp()
+func CreateFileCopy(file *os.File) (*os.File, error) {
+	copy, err := os.Create("copy-" + file.Name())
+	if err != nil {
+		return file, err
+	}
+	defer copy.Close()
 
-func info() {
-    app.Name = "Phishing simulator CLI"
-    app.Usage = "A CLI for simulating a Phishing"
-    app.Author = "Rodolfo"
-    app.Version = "1.0.0"
+	_, err = io.Copy(copy, file)
+	if err != nil {
+		return file, err
+	}
+
+	return os.Open(copy.Name())
 }
 
-func commands() {
-    app.Commands = []cli.Command{
-        {
-            Name:    "Replacement",
-            Aliases: []string{"rpc"},
-            Usage:   "Create a copy of the HTML page of any URL",
-
-            Action: func(c *cli.Context) {
-                if isValid(c) == "" {
-                    err := createHTMLPageCopy(c.Args().Get(0), c.Args().Get(1))
-                    if err != nil {
-                        panic(err)
-                    }
-
-                    return
-                }
-                fmt.Println(isValid(c))
-            },
-        },
-    }
+func checkError(err error) {
+	if err != nil {
+		panic(err)
+		os.Exit(0)
+	}
 }
 
-func isValid(c *cli.Context) (err string) {
-    if c.NArg() != 2 {
-        err = "Err: bad input: two params are required: filepath (destination) and URL (source)"
-    }
-    return err
-}
+func modifyLinks(file *os.File) {
+	doc, err := html.Parse(file)
+	checkError(err)
 
-func createHTMLPageCopy(filename, url string) (err error) {
-    fmt.Println("Downloading ", url, " to ", filename)
+	var f func(*html.Node)
+	f = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "a" {
+			for _, a := range n.Attr {
+				if a.Key == "href" {
+					fmt.Println(".")
+					a.Val = "https://www.google.com"
+				}
+			}
+		}
 
-    resp, err := http.Get(url)
-    if err != nil {
-        return
-    }
-    defer resp.Body.Close()
+		for at := n.FirstChild; at != nil; at = at.NextSibling {
+			f(at)
+		}
+	}
 
-    /*doc, err := goquery.NewDocumentFromResponse(resp)
-    if err != nil {
-        log.Fatal(err)
-    }
+	f(doc)
 
-    // Find the review items
-    doc.Find("a").Each(func(i int, s *goquery.Selection) {
-        // For each item found, get the band and title
-        s.SetAttr("href", "abcdefg")
-    })*/
-
-    file, err := os.Create(filename)
-    if err != nil {
-        return
-    }
-    defer file.Close()
-
-    _, err = io.Copy(file, resp.Body)
-    if err != nil {
-        return
-    }
-
-    fmt.Println(filename + " copied!")
-
-    // create from a file
-    /*one, err := os.Open("example.html")
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer one.Close()
-    doc, err := goquery.NewDocumentFromReader(one)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Find the review items
-    doc.Find("a").Each(func(i int, s *goquery.Selection) {
-        // For each item found, get the band and title
-        s.SetAttr("href", "abcdefg")
-    })*/
-
-    return
+	err = html.Render(file, doc)
+	checkError(err)
 }
 
 func main() {
-    info()
-    commands()
+	filename := "wawandco.html"
 
-    err := app.Run(os.Args)
-    if err != nil {
-        log.Fatal(err)
-    }
+	file, err := os.Open(filename)
+	checkError(err)
+
+	copy, err := CreateFileCopy(file)
+	checkError(err)
+
+	modifyLinks(copy)
 }
-
