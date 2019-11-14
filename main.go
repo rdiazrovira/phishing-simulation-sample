@@ -35,9 +35,12 @@ func ReplaceLinks(doc *goquery.Document, newLink string) {
 	})
 }
 
-func GetHtmlInTextFormatFromFile(src string) string {
-	bytes, _ := ioutil.ReadFile(src)
-	return string(bytes)
+func GetHtmlInTextFormatFromFile(src string) (string, error) {
+	bytes, err := ioutil.ReadFile(src)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
 }
 
 func WriteHtmlIntoFile(doc *goquery.Document, file *os.File) {
@@ -46,7 +49,7 @@ func WriteHtmlIntoFile(doc *goquery.Document, file *os.File) {
 }
 
 func main() {
-	text := GetHtmlInTextFormatFromFile(fileName)
+	text, _ := GetHtmlInTextFormatFromFile(fileName)
 
 	doc, _ := ExtractHtmlFrom(text)
 

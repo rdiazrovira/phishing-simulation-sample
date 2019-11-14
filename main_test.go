@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
 )
 
-var myHTML = `<body> <a href="https://myhtml.com">My HTML</a></body>`
+var myHTML = `<body><a href="https://myhtml.com">My HTML</a></body>`
 
 func TestCreateFileCopy(t *testing.T) {
 
@@ -20,18 +21,18 @@ func TestCreateFileCopy(t *testing.T) {
 		t.Error(err)
 	}
 
-	source, err := ioutil.ReadFile("copy-wawandco.html")
+	source, err := ioutil.ReadFile(fileName)
 	if err != nil {
-		t.Error("Not equals")
+		t.Error(err)
 	}
 
-	copy, err := ioutil.ReadFile("copy-wawandco.html")
+	copy, err := ioutil.ReadFile("copy-" + fileName)
 	if err != nil {
-		t.Error("Not equals")
+		t.Error(err)
 	}
 
 	if !bytes.Equal(source, copy) {
-		t.Error("Not equals")
+		t.Error("The files are differents")
 	}
 }
 
@@ -43,25 +44,35 @@ func TestExtractHtmlFromFile(t *testing.T) {
 }
 
 func TestReplaceLinks(t *testing.T) {
-	doc, _ := ExtractHtmlFrom(myHTML)
-
-	ReplaceLinks(doc, "https://www.google.com")
-
-	count := 0
-	doc.Find("a").Each(func(i int, a *goquery.Selection) {
-		href, _ := a.Attr("href")
-		if href == "https://www.google.com" {
-			count++
-		}
-	})
-
-	if count != 1 {
-		t.Error("Links didn't change")
+	cases := [][]string{
+		{"<body><a href=\"https://myhtml.com\">My HTML</a></body>", "https://www.google.com", "1"},
+		{"<body><a href=\"https://myhtml.com\">My HTML</a></br><a href=\"https://example.com\">Example</a></body>", "https://www.google.com", "2"},
+		{"<body><a href=\"https://myhtml.com\">My HTML</a></body>", "https://www.anotherexample.com", "1"},
 	}
+
+	for _, c := range cases {
+		doc, _ := ExtractHtmlFrom(c[0])
+
+		ReplaceLinks(doc, c[1])
+
+		count := 0
+		doc.Find("a").Each(func(i int, a *goquery.Selection) {
+			href, _ := a.Attr("href")
+			if href == c[1] {
+				count++
+			}
+		})
+
+		r, _ := strconv.Atoi(c[2])
+		if count != r {
+			t.Error("Links didn't change")
+		}
+	}
+
 }
 
 func TestGetHtmlInTextFormat(t *testing.T) {
-	text := GetHtmlInTextFormatFromFile(fileName)
+	text, _ := GetHtmlInTextFormatFromFile(fileName)
 
 	if len(text) == 0 {
 		t.Error("Html could not be extracted in String format.")
@@ -69,33 +80,37 @@ func TestGetHtmlInTextFormat(t *testing.T) {
 }
 
 func TestWriteHtmlIntoFile(t *testing.T) {
-	doc, _ := ExtractHtmlFrom(myHTML)
 
-	copy, _ := os.Create("test.html")
-	defer copy.Close()
-
-	WriteHtmlIntoFile(doc, copy)
-
-	text := GetHtmlInTextFormatFromFile(copy.Name())
-
-	if len(text) == 0 {
-		t.Error("Html could not be extracted in String format.")
+	cases := [][]string{
+		{"test1.html", "<body><a href=\"https://myhtml.com\">My HTML</a></body>", "1"},
+		{"test2.html", "<body><a href=\"https://myhtml.com\">My HTML</a></br><a href=\"https://myhtml.com\">My HTML</a></body>", "2"},
+		{"test3.html", "<body><a href=\"https://myhtml.com\">My HTML</a></br><a href=\"https://www.google.com\">Google</a></br><a href=\"https://myhtml.com\">My HTML</a></body>", "2"},
 	}
 
-	count := 0
-	doc.Find("a").Each(func(i int, a *goquery.Selection) {
-		href, _ := a.Attr("href")
-		if href == "https://myhtml.com" {
-			count++
+	for index, c := range cases {
+		copy, _ := os.Create(c[0])
+		defer copy.Close()
+
+		doc, _ := ExtractHtmlFrom(c[1])
+
+		WriteHtmlIntoFile(doc, copy)
+
+		count := 0
+		doc.Find("a").Each(func(i int, a *goquery.Selection) {
+			href, _ := a.Attr("href")
+			if href == "https://myhtml.com" {
+				count++
+			}
+		})
+
+		r, _ := strconv.Atoi(c[2])
+		if count != r {
+			t.Error("Links didn't change for the case: " + strconv.Itoa(index+1))
 		}
-	})
 
-	if count != 1 {
-		t.Error("Links didn't change")
-	}
-
-	err := os.Remove(copy.Name())
-	if err != nil {
-		t.Error(err)
+		err := os.Remove(copy.Name())
+		if err != nil {
+			t.Error(err)
+		}
 	}
 }
