@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
-	"golang.org/x/net/html"
+	"github.com/PuerkitoBio/goquery"
 )
 
 func CreateFileCopy(file *os.File) (*os.File, error) {
@@ -13,7 +14,6 @@ func CreateFileCopy(file *os.File) (*os.File, error) {
 	if err != nil {
 		return file, err
 	}
-	defer copy.Close()
 
 	_, err = io.Copy(copy, file)
 	if err != nil {
@@ -23,47 +23,22 @@ func CreateFileCopy(file *os.File) (*os.File, error) {
 	return os.Open(copy.Name())
 }
 
-func checkError(err error) {
-	if err != nil {
-		panic(err)
-		os.Exit(0)
-	}
+func ExtractHtmlFrom(text string) (*goquery.Document, error) {
+	return goquery.NewDocumentFromReader(strings.NewReader(text))
 }
 
-func modifyLinks(file *os.File) {
-	doc, err := html.Parse(file)
-	checkError(err)
-
-	var f func(*html.Node)
-	f = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "a" {
-			for _, a := range n.Attr {
-				if a.Key == "href" {
-					fmt.Println(".")
-					a.Val = "https://www.google.com"
-				}
-			}
-		}
-
-		for at := n.FirstChild; at != nil; at = at.NextSibling {
-			f(at)
-		}
-	}
-
-	f(doc)
-
-	err = html.Render(file, doc)
-	checkError(err)
+func ReplaceLinks(doc *goquery.Document, newLink string) {
+	doc.Find("a").Each(func(i int, a *goquery.Selection) {
+		a.SetAttr("href", newLink)
+	})
 }
 
 func main() {
-	filename := "wawandco.html"
+	text := `<body><a href="https://myhtml.com">My HTML</a></body>`
 
-	file, err := os.Open(filename)
-	checkError(err)
+	doc, _ := ExtractHtmlFrom(text)
 
-	copy, err := CreateFileCopy(file)
-	checkError(err)
+	ReplaceLinks(doc, "https://www.google.com")
 
-	modifyLinks(copy)
+	fmt.Println(doc.Html())
 }
