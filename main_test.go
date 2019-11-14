@@ -12,9 +12,8 @@ import (
 var myHTML = `<body> <a href="https://myhtml.com">My HTML</a></body>`
 
 func TestCreateFileCopy(t *testing.T) {
-	filename := "wawandco.html"
 
-	file, _ := os.Open(filename)
+	file, _ := os.Open(fileName)
 
 	_, err := CreateFileCopy(file)
 	if err != nil {
@@ -58,5 +57,45 @@ func TestReplaceLinks(t *testing.T) {
 
 	if count != 1 {
 		t.Error("Links didn't change")
+	}
+}
+
+func TestGetHtmlInTextFormat(t *testing.T) {
+	text := GetHtmlInTextFormatFromFile(fileName)
+
+	if len(text) == 0 {
+		t.Error("Html could not be extracted in String format.")
+	}
+}
+
+func TestWriteHtmlIntoFile(t *testing.T) {
+	doc, _ := ExtractHtmlFrom(myHTML)
+
+	copy, _ := os.Create("test.html")
+	defer copy.Close()
+
+	WriteHtmlIntoFile(doc, copy)
+
+	text := GetHtmlInTextFormatFromFile(copy.Name())
+
+	if len(text) == 0 {
+		t.Error("Html could not be extracted in String format.")
+	}
+
+	count := 0
+	doc.Find("a").Each(func(i int, a *goquery.Selection) {
+		href, _ := a.Attr("href")
+		if href == "https://myhtml.com" {
+			count++
+		}
+	})
+
+	if count != 1 {
+		t.Error("Links didn't change")
+	}
+
+	err := os.Remove(copy.Name())
+	if err != nil {
+		t.Error(err)
 	}
 }
