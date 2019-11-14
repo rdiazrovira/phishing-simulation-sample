@@ -1,13 +1,15 @@
 package main
 
 import (
-	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 )
+
+var fileName = "wawandco.html"
 
 func CreateFileCopy(file *os.File) (*os.File, error) {
 	copy, err := os.Create("copy-" + file.Name())
@@ -33,12 +35,25 @@ func ReplaceLinks(doc *goquery.Document, newLink string) {
 	})
 }
 
+func GetHtmlInTextFormatFromFile(src string) string {
+	bytes, _ := ioutil.ReadFile(src)
+	return string(bytes)
+}
+
+func WriteHtmlIntoFile(doc *goquery.Document, file *os.File) {
+	result, _ := doc.Html()
+	file.WriteString(result)
+}
+
 func main() {
-	text := `<body><a href="https://myhtml.com">My HTML</a></body>`
+	text := GetHtmlInTextFormatFromFile(fileName)
 
 	doc, _ := ExtractHtmlFrom(text)
 
 	ReplaceLinks(doc, "https://www.google.com")
 
-	fmt.Println(doc.Html())
+	copy, _ := os.Create("copy-" + fileName)
+	defer copy.Close()
+
+	WriteHtmlIntoFile(doc, copy)
 }
