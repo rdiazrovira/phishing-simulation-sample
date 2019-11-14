@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -43,20 +44,51 @@ func GetHtmlInTextFormatFromFile(src string) (string, error) {
 	return string(bytes), nil
 }
 
-func WriteHtmlIntoFile(doc *goquery.Document, file *os.File) {
+func WriteHtmlIntoFile(doc *goquery.Document, file *os.File) (int, error) {
 	result, _ := doc.Html()
-	file.WriteString(result)
+	return file.WriteString(result)
 }
 
+const message = `
+My Cli is a tool for replacing the links <a> of a page html.
+
+Usage:
+
+	./main [arguments]
+	
+The arguments should be: 
+	[path]	Path to a HTML file (1st).
+	[URL]	Replacement URL (2nd).
+
+With those arguments it will create a copy of that HTML file (myfile.html) 
+with the same content that the original except for all the links <a>
+replaced by [URL].`
+
 func main() {
-	text, _ := GetHtmlInTextFormatFromFile(fileName)
+	if len(os.Args) != 3 {
+		fmt.Println(message)
+		return
+	}
 
-	doc, _ := ExtractHtmlFrom(text)
+	text, err := GetHtmlInTextFormatFromFile(os.Args[1])
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
-	ReplaceLinks(doc, "https://www.google.com")
+	doc, err := ExtractHtmlFrom(text)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
-	copy, _ := os.Create("copy-" + fileName)
+	ReplaceLinks(doc, os.Args[2])
+
+	copy, _ := os.Create("copy-" + os.Args[1])
 	defer copy.Close()
 
-	WriteHtmlIntoFile(doc, copy)
+	_, err = WriteHtmlIntoFile(doc, copy)
+	if err == nil {
+		fmt.Println("Links replaced.")
+	}
 }
