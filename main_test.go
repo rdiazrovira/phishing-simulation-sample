@@ -14,19 +14,19 @@ var myHTML = `<body><a href="https://myhtml.com">My HTML</a></body>`
 
 func TestCreateFileCopy(t *testing.T) {
 
-	file, _ := os.Open(fileName)
+	file, _ := os.Open(filepath)
 
 	_, err := CreateFileCopy(file)
 	if err != nil {
 		t.Error(err)
 	}
 
-	source, err := ioutil.ReadFile(fileName)
+	source, err := ioutil.ReadFile(filepath)
 	if err != nil {
 		t.Error(err)
 	}
 
-	copy, err := ioutil.ReadFile("copy-" + fileName)
+	copy, err := ioutil.ReadFile(newFilename)
 	if err != nil {
 		t.Error(err)
 	}
@@ -72,7 +72,7 @@ func TestReplaceLinks(t *testing.T) {
 }
 
 func TestGetHtmlInTextFormat(t *testing.T) {
-	text, _ := GetHtmlInTextFormatFromFile(fileName)
+	text, _ := GetHtmlInTextFormatFromFile(filepath)
 
 	if len(text) == 0 {
 		t.Error("Html could not be extracted in String format.")

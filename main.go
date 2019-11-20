@@ -1,19 +1,23 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
+	"net/http"
 	"os"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 )
 
-var fileName = "wawandco.html"
+const filepath = "wawandco.html"
+const newFilename = "copy.html"
 
 func CreateFileCopy(file *os.File) (*os.File, error) {
-	copy, err := os.Create("copy-" + file.Name())
+	copy, err := os.Create(newFilename)
 	if err != nil {
 		return file, err
 	}
@@ -49,6 +53,58 @@ func WriteHtmlIntoFile(doc *goquery.Document, file *os.File) (int, error) {
 	return file.WriteString(result)
 }
 
+func getParamValueByName(r *http.Request, name string) string {
+	arguments, ok := r.URL.Query()[name]
+
+	if !ok || len(arguments[0]) < 1 {
+		return ""
+	}
+
+	return string(arguments[0])
+}
+
+func replaceLinksFromFile(filepath, url string) (string, error) {
+
+	if filepath == "" || url == "" {
+		return "", errors.New("Empty params")
+	}
+
+	text, err := GetHtmlInTextFormatFromFile(filepath)
+	if err != nil {
+		return "", err
+	}
+
+	doc, err := ExtractHtmlFrom(text)
+	if err != nil {
+		return "", err
+	}
+
+	ReplaceLinks(doc, url)
+
+	copy, _ := os.Create(newFilename)
+	defer copy.Close()
+
+	_, err = WriteHtmlIntoFile(doc, copy)
+	return copy.Name(), err
+}
+
+func runServer() {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		filepath := getParamValueByName(r, "filepath")
+		url := getParamValueByName(r, "url")
+
+		_, err := replaceLinksFromFile(filepath, url)
+		if err == nil {
+			fmt.Println("Links replaced.")
+			http.ServeFile(w, r, newFilename)
+			return
+		}
+
+		fmt.Println(err)
+	})
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
 const message = `
 My Cli is a tool for replacing the links <a> of a page html.
 
@@ -65,29 +121,17 @@ with the same content that the original except for all the links <a>
 replaced by [URL].`
 
 func main() {
+	if len(os.Args) <= 1 {
+		runServer()
+		return
+	}
+
 	if len(os.Args) != 3 {
 		fmt.Println(message)
 		return
 	}
 
-	text, err := GetHtmlInTextFormatFromFile(os.Args[1])
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	doc, err := ExtractHtmlFrom(text)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	ReplaceLinks(doc, os.Args[2])
-
-	copy, _ := os.Create("copy-" + os.Args[1])
-	defer copy.Close()
-
-	_, err = WriteHtmlIntoFile(doc, copy)
+	_, err := replaceLinksFromFile(os.Args[1], os.Args[2])
 	if err == nil {
 		fmt.Println("Links replaced.")
 	}
